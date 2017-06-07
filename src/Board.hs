@@ -1,4 +1,32 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Board where
+
+import Control.Monad (liftM)
+
+-- |A square is maybe a piece (or nothing i.e. empty)
+type Square p = Maybe p
+
+-- |A square list is a list of squares
+type SquareList p = [Square p]
+
+-- |A list board is a simple (and maybe inefficient) way to store a 2 dimensional board
+-- It is a list of lists of squares, i.e. [[Maybe Piece]]
+data ListBoard p = ListBoard [SquareList p]
+
+class Piece p where
+    readPiece :: Char -> Maybe p
+    showPiece :: p -> Char
+
+
+class Piece p => Board b p | b -> p where
+    readBoard :: String -> Maybe b
+
+    showBoard :: b -> String
+
+-- Chess
 
 initialChessBoard = unlines $ [ "rnbqkbnr"
                               , "pppppppp"
@@ -14,7 +42,7 @@ data ChessType = Pawn | Knight | Bishop | Rook | Queen | King deriving (Show, Eq
 data ChessColor = White | Black deriving (Show, Eq, Ord)
 data ChessPiece = Piece ChessColor ChessType deriving (Show, Eq, Ord)
 
-instance PieceReader ChessPiece where
+instance Piece ChessPiece where
     readPiece 'P' = Just $ Piece White Pawn
     readPiece 'N' = Just $ Piece White Knight
     readPiece 'B' = Just $ Piece White Bishop
@@ -42,22 +70,20 @@ instance PieceReader ChessPiece where
     showPiece (Piece Black Queen ) = 'q'
     showPiece (Piece Black King  ) = 'k'
 
-instance BoardReader ChessPiece
-
-class PieceReader p where
-    readPiece :: Char -> Maybe p
-    showPiece :: p -> Char
-
-class (PieceReader p) => BoardReader p where
-    readBoard :: String -> Maybe [[Maybe p]]
-    readBoard = (mapM readLine) . lines
-                where readLine :: (PieceReader p) => [Char] -> Maybe [Maybe p]
+instance Piece p => Board (ListBoard p) p where
+    readBoard = fmap ListBoard . (mapM readLine) . lines
+                where readLine :: Piece p => [Char] -> Maybe (SquareList p)
                       readLine = mapM readSquare
-                      readSquare :: (PieceReader p) => Char -> Maybe (Maybe p)
+                      readSquare :: Piece p => Char -> Maybe (Square p)
                       readSquare '.' = Just Nothing
                       readSquare a = case (readPiece a) of
                                         Just b    -> Just (Just b)
                                         otherwise -> Nothing
+
+    showBoard (ListBoard bs) = unlines . map showLine $ bs
+                where showLine :: Piece p => SquareList p -> [Char]
+                      showLine = map showSquare
+                      showSquare :: Piece p => Square p -> Char
+                      showSquare (Just x) = showPiece x
+                      showSquare Nothing = '.'
                                          
-
-
